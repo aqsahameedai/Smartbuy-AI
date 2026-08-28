@@ -1,0 +1,1687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartBuy AI — Your Agentic Personal Shopper</title>
+<meta name="description" content="SmartBuy AI is a client-side demo of an AI personal shopping agent: it reads what you need, scores a live catalog, and builds your cart — the agentic commerce loop, running entirely in your browser.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ==========================================================================
+   SmartBuy AI — Design tokens
+   Palette drawn from the shopping-bag / register-receipt world:
+   paper, ink, and two accents pulled off a printed price tag.
+   ========================================================================== */
+
+:root{
+  --paper:        #EEF0EA;
+  --paper-raised: #FBF9F3;
+  --ink:          #14231F;
+  --ink-soft:     #3C4A45;
+  --line:         #D8D3C4;
+  --teal:         #1F8A70;
+  --teal-dark:    #166655;
+  --coral:        #E8543E;
+  --coral-dark:   #C13F2C;
+  --white:        #FFFFFF;
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body:    'Inter', system-ui, sans-serif;
+  --font-mono:    'IBM Plex Mono', 'Courier New', monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+
+  --shadow-card: 0 1px 2px rgba(20,35,31,0.06), 0 8px 24px -12px rgba(20,35,31,0.18);
+  --shadow-pop:  0 24px 60px -20px rgba(20,35,31,0.45);
+
+  --container: 1180px;
+}
+
+@media (prefers-color-scheme: dark){
+  /* Intentionally not auto-switching to a full dark theme — the paper/ink
+     contrast is a design choice, not a light-mode default. */
+}
+
+*, *::before, *::after{ box-sizing: border-box; }
+
+html{ scroll-behavior: smooth; }
+
+body{
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce){
+  html{ scroll-behavior: auto; }
+  *, *::before, *::after{ animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+
+img, svg{ display: block; max-width: 100%; }
+
+a{ color: inherit; }
+
+.wrap{
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+h1, h2, h3{
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.12;
+  margin: 0 0 0.5em;
+  letter-spacing: -0.01em;
+}
+
+p{ margin: 0 0 1em; color: var(--ink-soft); }
+
+.mono{ font-family: var(--font-mono); }
+
+.eyebrow{
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--teal-dark);
+  margin: 0 0 0.9em;
+}
+
+.section-title{
+  font-size: clamp(1.6rem, 1.2rem + 1.5vw, 2.3rem);
+  color: var(--ink);
+}
+
+.section-sub{
+  max-width: 60ch;
+  font-size: 1.02rem;
+}
+
+:focus-visible{
+  outline: 2px solid var(--teal-dark);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.96rem;
+  padding: 0.85em 1.5em;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.btn:active{ transform: translateY(1px); }
+
+.btn-primary{
+  background: var(--ink);
+  color: var(--paper-raised);
+}
+.btn-primary:hover{ background: var(--teal-dark); }
+
+.btn-ghost{
+  background: transparent;
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.btn-ghost:hover{ background: var(--ink); color: var(--paper-raised); }
+
+.btn-block{ width: 100%; }
+
+.btn-add{
+  width: 100%;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.6em 1em;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.btn-add:hover{ background: var(--ink); color: var(--paper-raised); }
+.btn-add[data-added="true"]{ background: var(--teal); border-color: var(--teal); color: var(--white); }
+
+.icon-btn{
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--ink);
+  padding: 4px 8px;
+}
+
+/* ==========================================================================
+   Header
+   ========================================================================== */
+
+.site-header{
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(238,240,234,0.88);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+.header-row{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 68px;
+}
+
+.brand{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.brand-mark{ color: var(--coral); font-size: 1.1rem; }
+.brand-name{
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.15rem;
+}
+.brand-name em{ font-style: normal; color: var(--teal-dark); }
+
+.main-nav{
+  display: flex;
+  gap: 28px;
+}
+.main-nav a{
+  text-decoration: none;
+  font-size: 0.94rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.main-nav a:hover{ color: var(--ink); }
+
+.header-actions{ display: flex; align-items: center; gap: 12px; }
+
+.cart-btn{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: var(--paper-raised);
+  color: var(--ink);
+  cursor: pointer;
+}
+.cart-count{
+  position: absolute;
+  top: -6px; right: -6px;
+  background: var(--coral);
+  color: var(--white);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px;
+}
+
+.nav-toggle{
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+}
+.nav-toggle span{
+  width: 20px; height: 2px;
+  background: var(--ink);
+  border-radius: 2px;
+}
+
+/* ==========================================================================
+   Hero + Terminal (signature element)
+   ========================================================================== */
+
+.hero{ padding: 64px 0 40px; }
+
+.hero-grid{
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 56px;
+  align-items: center;
+}
+
+.hero-copy h1{
+  font-size: clamp(2.1rem, 1.4rem + 3vw, 3.4rem);
+}
+
+.hero-sub{ font-size: 1.08rem; max-width: 46ch; }
+
+.hero-actions{ display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+
+.hero-flags{
+  list-style: none;
+  padding: 0; margin: 0;
+  display: flex; flex-wrap: wrap; gap: 10px 20px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.hero-flags li::before{ content: "· "; color: var(--coral); }
+.hero-flags li:first-child::before{ content: ""; }
+
+/* ---- Terminal ---- */
+
+.terminal{
+  background: var(--ink);
+  color: #E9F3EF;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+}
+
+.terminal-head{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  background: #0D1815;
+  border-bottom: 1px dashed #2B3B36;
+}
+.terminal-head .dot{
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #3C4A45;
+}
+.terminal-title{
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: #9FB5AD;
+}
+
+.terminal-body{
+  flex: 1;
+  padding: 18px;
+  overflow-y: auto;
+  max-height: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+}
+
+.msg{ max-width: 100%; }
+.msg-role{
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #6E8B81;
+  margin-bottom: 4px;
+}
+.msg-user .msg-role{ color: #E8A895; }
+.msg-text{ color: #E9F3EF; line-height: 1.55; white-space: pre-wrap; }
+
+.msg-cards{
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.msg-card{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #182B25;
+  border: 1px dashed #2B3B36;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  color: #E9F3EF;
+  font-family: var(--font-body);
+  width: 100%;
+}
+.msg-card:hover{ border-color: var(--teal); }
+.msg-card .mc-icon{ font-size: 1.3rem; }
+.msg-card .mc-info{ flex: 1; min-width: 0; }
+.msg-card .mc-name{ font-weight: 600; font-size: 0.88rem; }
+.msg-card .mc-sub{ font-family: var(--font-mono); font-size: 0.76rem; color: #9FB5AD; }
+.msg-card .mc-add{
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--teal);
+  border: 1px solid var(--teal);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.typing-dots{ display: inline-flex; gap: 4px; align-items: center; }
+.typing-dots span{
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #6E8B81;
+  animation: blink 1.2s infinite ease-in-out;
+}
+.typing-dots span:nth-child(2){ animation-delay: 0.2s; }
+.typing-dots span:nth-child(3){ animation-delay: 0.4s; }
+@keyframes blink{ 0%, 80%, 100%{ opacity: 0.25; } 40%{ opacity: 1; } }
+
+.terminal-suggestions{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 18px 14px;
+}
+.chip-suggest{
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  background: transparent;
+  color: #9FB5AD;
+  border: 1px dashed #2B3B36;
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chip-suggest:hover{ border-color: var(--teal); color: #E9F3EF; }
+
+.terminal-input{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-top: 1px dashed #2B3B36;
+  background: #0D1815;
+}
+.prompt-caret{ color: var(--teal); font-family: var(--font-mono); }
+.terminal-input input{
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #E9F3EF;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  padding: 8px 0;
+}
+.terminal-input input:focus{ outline: none; }
+.terminal-input input::placeholder{ color: #587068; }
+.terminal-input button{
+  background: var(--teal);
+  color: var(--white);
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+.terminal-input button:hover{ background: var(--teal-dark); }
+
+/* ==========================================================================
+   How it works
+   ========================================================================== */
+
+.how{ padding: 72px 0; }
+
+.steps{
+  list-style: none;
+  margin: 40px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+.step{
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 26px 24px;
+}
+.step-num{
+  display: block;
+  font-family: var(--font-mono);
+  color: var(--coral);
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+}
+.step h3{ font-size: 1.15rem; margin-bottom: 0.4em; }
+.step p{ font-size: 0.94rem; margin-bottom: 0; }
+
+/* ==========================================================================
+   Catalog
+   ========================================================================== */
+
+.catalog{ padding: 24px 0 80px; }
+
+.catalog-head{
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.catalog-search input{
+  width: 260px;
+  max-width: 100%;
+  padding: 0.7em 1em;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--paper-raised);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+}
+.catalog-search input:focus{ outline: none; border-color: var(--teal); }
+
+.catalog-controls{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 26px;
+}
+
+.chip-row{ display: flex; flex-wrap: wrap; gap: 8px; }
+.chip{
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--paper-raised);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.chip[aria-selected="true"]{
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper-raised);
+}
+
+.sort-select{
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sort-select select{
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  padding: 0.5em 0.8em;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--line);
+  background: var(--paper-raised);
+  color: var(--ink);
+}
+
+.product-grid{
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.product-card{
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease;
+}
+.product-card:hover{ transform: translateY(-3px); }
+
+.product-media{
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  background: repeating-linear-gradient(135deg, var(--swatch-a) 0 14px, var(--swatch-b) 14px 28px);
+}
+.product-card[data-swatch="teal"] .product-media{ --swatch-a:#1F8A70; --swatch-b:#166655; }
+.product-card[data-swatch="coral"] .product-media{ --swatch-a:#E8543E; --swatch-b:#C13F2C; }
+.product-card[data-swatch="ink"] .product-media{ --swatch-a:#14231F; --swatch-b:#243832; }
+
+.product-body{ padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+
+.product-cat{
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--teal-dark);
+  margin: 0;
+}
+.product-name{ font-size: 1rem; margin: 0; }
+.product-blurb{ font-size: 0.86rem; margin: 0 0 8px; flex: 1; }
+
+.product-meta{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  margin-bottom: 10px;
+}
+.product-rating{ color: var(--ink-soft); }
+.product-price{ font-weight: 600; color: var(--ink); }
+
+.empty-state{ text-align: center; padding: 40px 0; font-family: var(--font-mono); }
+
+/* ==========================================================================
+   Agentic commerce explainer
+   ========================================================================== */
+
+.agentic{ padding: 72px 0; background: var(--paper-raised); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+
+.agentic-grid{
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 48px;
+  align-items: start;
+}
+
+.compare{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.compare-col{
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 22px;
+}
+.compare-col h3{ font-size: 1rem; margin-bottom: 0.8em; }
+.compare-col ul{ margin: 0; padding-left: 1.1em; font-size: 0.9rem; color: var(--ink-soft); display: flex; flex-direction: column; gap: 8px; }
+.compare-col--agent{ background: var(--ink); border-color: var(--ink); }
+.compare-col--agent h3{ color: var(--paper); }
+.compare-col--agent ul{ color: #C7D6D0; }
+
+/* ==========================================================================
+   Final CTA + footer
+   ========================================================================== */
+
+.cta{ padding: 72px 0; text-align: center; }
+.cta-inner{ max-width: 620px; margin: 0 auto; }
+.cta h2{ font-size: clamp(1.6rem, 1.2rem + 1.4vw, 2.1rem); }
+.cta code{
+  font-family: var(--font-mono);
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  font-size: 0.88em;
+}
+
+.site-footer{
+  border-top: 1px solid var(--line);
+  padding: 22px 0 40px;
+}
+.footer-row{
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+/* ==========================================================================
+   Cart drawer
+   ========================================================================== */
+
+.drawer-backdrop{
+  position: fixed; inset: 0;
+  background: rgba(20,35,31,0.4);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 60;
+}
+.drawer-backdrop.open{ opacity: 1; pointer-events: auto; }
+
+.cart-drawer{
+  position: fixed;
+  top: 0; right: 0;
+  width: min(400px, 100%);
+  height: 100%;
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-pop);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+}
+.cart-drawer.open{ transform: translateX(0); }
+
+.cart-head{
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.cart-head h2{ margin: 0; font-size: 1.2rem; }
+
+.cart-items{
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cart-item{
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border-bottom: 1px dashed var(--line);
+  padding-bottom: 14px;
+}
+.cart-item-icon{
+  width: 44px; height: 44px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+.cart-item-info{ flex: 1; min-width: 0; }
+.cart-item-name{ font-size: 0.9rem; font-weight: 600; margin: 0 0 2px; }
+.cart-item-price{ font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-soft); }
+
+.qty-row{ display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.qty-btn{
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: var(--paper-raised);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+.qty-val{ font-family: var(--font-mono); font-size: 0.85rem; min-width: 16px; text-align: center; }
+.cart-item-remove{
+  background: none; border: none; color: var(--coral); font-family: var(--font-mono);
+  font-size: 0.74rem; cursor: pointer; padding: 0;
+}
+
+.cart-empty{ padding: 0 22px; font-size: 0.9rem; }
+
+.cart-summary{
+  border-top: 1px solid var(--line);
+  padding: 18px 22px 22px;
+}
+.cart-line{
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
+  margin-bottom: 8px;
+}
+.cart-line--muted{ color: var(--teal-dark); font-size: 0.8rem; }
+
+/* ==========================================================================
+   Checkout modal (receipt)
+   ========================================================================== */
+
+.modal-backdrop{
+  position: fixed; inset: 0;
+  background: rgba(20,35,31,0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 80;
+}
+.modal-backdrop.open{ opacity: 1; pointer-events: auto; }
+
+.receipt{
+  background: var(--paper-raised);
+  width: min(380px, 100%);
+  border-radius: 4px;
+  box-shadow: var(--shadow-pop);
+  position: relative;
+}
+.receipt-tear{
+  height: 10px;
+  background:
+    linear-gradient(-45deg, transparent 8px, var(--paper-raised) 0) 0 0,
+    linear-gradient(45deg, transparent 8px, var(--paper-raised) 0) 0 0;
+  background-size: 16px 16px;
+  background-color: rgba(20,35,31,0.55);
+}
+.receipt-body{ padding: 28px 26px 26px; text-align: center; }
+.receipt-body h2{ font-size: 1.3rem; }
+#receiptId{ font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 18px; }
+
+.receipt-lines{
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  border-top: 1px dashed var(--line);
+  border-bottom: 1px dashed var(--line);
+  padding: 14px 0;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.receipt-line{ display: flex; justify-content: space-between; gap: 12px; }
+.receipt-line span:first-child{ color: var(--ink-soft); }
+
+.receipt-total{
+  display: flex; justify-content: space-between;
+  font-size: 1rem; font-weight: 600;
+  margin-bottom: 18px;
+}
+.receipt-note{ font-size: 0.82rem; margin-bottom: 20px; }
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 980px){
+  .hero-grid{ grid-template-columns: 1fr; }
+  .steps{ grid-template-columns: 1fr; }
+  .product-grid{ grid-template-columns: repeat(3, 1fr); }
+  .agentic-grid{ grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px){
+  .main-nav{
+    position: absolute;
+    top: 68px; left: 0; right: 0;
+    background: var(--paper-raised);
+    border-bottom: 1px solid var(--line);
+    flex-direction: column;
+    padding: 16px 24px 20px;
+    gap: 14px;
+    display: none;
+  }
+  .main-nav.open{ display: flex; }
+  .nav-toggle{ display: flex; }
+  .product-grid{ grid-template-columns: repeat(2, 1fr); }
+  .compare{ grid-template-columns: 1fr; }
+  .catalog-search input{ width: 100%; }
+  .catalog-head{ flex-direction: column; align-items: stretch; }
+}
+
+@media (max-width: 520px){
+  .wrap{ padding: 0 18px; }
+  .hero{ padding: 40px 0 28px; }
+  .product-grid{ grid-template-columns: 1fr 1fr; }
+  .hero-actions{ flex-direction: column; align-items: stretch; }
+  .hero-actions .btn{ width: 100%; }
+  .terminal{ min-height: 420px; }
+  .cart-drawer{ width: 100%; }
+}
+
+@media (max-width: 400px){
+  .product-grid{ grid-template-columns: 1fr; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- ============================= NAV ============================= -->
+<header class="site-header">
+  <div class="wrap header-row">
+    <a class="brand" href="#top">
+      <span class="brand-mark" aria-hidden="true">◆</span>
+      <span class="brand-name">SmartBuy<em>AI</em></span>
+    </a>
+
+    <nav class="main-nav" id="mainNav">
+      <a href="#agent">Agent</a>
+      <a href="#how">How it works</a>
+      <a href="#catalog">Catalog</a>
+      <a href="#agentic">Agentic Commerce</a>
+    </nav>
+
+    <div class="header-actions">
+      <button class="cart-btn" id="cartToggle" aria-haspopup="dialog" aria-controls="cartDrawer" aria-label="Open cart">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 4h2l2.2 11.6a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L21 8H6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="21" r="1.4" fill="currentColor"/><circle cx="17" cy="21" r="1.4" fill="currentColor"/></svg>
+        <span class="cart-count" id="cartCount">0</span>
+      </button>
+      <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="mainNav" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ============================= HERO ============================= -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">AI Growth &amp; Agentic Commerce · Project Demo</p>
+        <h1>An agent that shops<br>the way you'd want to,<br>if you had the time.</h1>
+        <p class="hero-sub">Tell SmartBuy AI what you need in plain language. It reads your budget and intent, scores every listing in the catalog, and hands you a ranked cart — no menus to dig through.</p>
+        <div class="hero-actions">
+          <a href="#agent" class="btn btn-primary">Talk to the agent</a>
+          <a href="#catalog" class="btn btn-ghost">Browse catalog</a>
+        </div>
+        <ul class="hero-flags">
+          <li>Runs fully in-browser</li>
+          <li>No API key required</li>
+          <li>24 live products, 5 categories</li>
+        </ul>
+      </div>
+
+      <div class="hero-terminal">
+        <div class="terminal" id="terminalPreview">
+          <div class="terminal-head">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span class="terminal-title">agent://smartbuy</span>
+          </div>
+          <div class="terminal-body" id="chatLog" aria-live="polite"></div>
+
+          <div class="terminal-suggestions" id="suggestionChips"></div>
+
+          <form class="terminal-input" id="chatForm">
+            <span class="prompt-caret" aria-hidden="true">&gt;</span>
+            <input type="text" id="chatInput" autocomplete="off" placeholder="e.g. running shoes under $100" aria-label="Ask the shopping agent">
+            <button type="submit" aria-label="Send">Send</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= HOW IT WORKS ============================= -->
+  <section class="how" id="how">
+    <div class="wrap">
+      <h2 class="section-title">The agent loop</h2>
+      <p class="section-sub">Three steps happen behind every reply — this is the same read → reason → act loop agentic-commerce systems run in production, simplified so you can watch it work.</p>
+
+      <ol class="steps">
+        <li class="step">
+          <span class="step-num">01</span>
+          <h3>You state intent</h3>
+          <p>Natural language in — budget, category, occasion, quality bar. No filters to configure first.</p>
+        </li>
+        <li class="step">
+          <span class="step-num">02</span>
+          <h3>Agent scores the catalog</h3>
+          <p>Every listing is ranked live against your intent: keyword match, price fit, rating, gift signal.</p>
+        </li>
+        <li class="step">
+          <span class="step-num">03</span>
+          <h3>Agent acts on your behalf</h3>
+          <p>Top matches are surfaced ready to add. One tap moves them from recommendation to cart.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============================= CATALOG ============================= -->
+  <section class="catalog" id="catalog">
+    <div class="wrap">
+      <div class="catalog-head">
+        <div>
+          <h2 class="section-title">Full catalog</h2>
+          <p class="section-sub">Everything the agent can search — browse it directly, or let the agent narrow it for you above.</p>
+        </div>
+        <div class="catalog-search">
+          <input type="search" id="catalogSearch" placeholder="Search products…" aria-label="Search catalog">
+        </div>
+      </div>
+
+      <div class="catalog-controls">
+        <div class="chip-row" id="categoryChips" role="tablist" aria-label="Filter by category"></div>
+        <label class="sort-select">
+          Sort
+          <select id="sortSelect">
+            <option value="match">AI match</option>
+            <option value="price-asc">Price: low to high</option>
+            <option value="price-desc">Price: high to low</option>
+            <option value="rating">Rating</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="product-grid" id="productGrid"></div>
+      <p class="empty-state" id="emptyState" hidden>No products match those filters. Try widening the price range or clearing the search.</p>
+    </div>
+  </section>
+
+  <!-- ============================= AGENTIC COMMERCE EXPLAINER ============================= -->
+  <section class="agentic" id="agentic">
+    <div class="wrap agentic-grid">
+      <div>
+        <p class="eyebrow">Why this project exists</p>
+        <h2 class="section-title">From search boxes to shopping agents</h2>
+        <p class="section-sub">Agentic commerce is the shift from people operating storefronts to people delegating outcomes to an agent that operates the storefront for them. SmartBuy AI is a small, transparent model of that shift.</p>
+      </div>
+
+      <div class="compare">
+        <div class="compare-col">
+          <h3>Traditional e-commerce</h3>
+          <ul>
+            <li>You choose filters, categories, and sort order</li>
+            <li>You compare tabs and listings manually</li>
+            <li>You re-search for every new need</li>
+          </ul>
+        </div>
+        <div class="compare-col compare-col--agent">
+          <h3>Agentic commerce</h3>
+          <ul>
+            <li>You state the outcome you want in plain language</li>
+            <li>The agent parses intent, scores inventory, and ranks results</li>
+            <li>The agent proposes the cart — you approve or refine it</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= FOOTER CTA ============================= -->
+  <section class="cta">
+    <div class="wrap cta-inner">
+      <h2>Fork it, extend it, ship it.</h2>
+      <p>This entire agent runs on rule-based scoring — no backend, no API key. Swap <code>js/agent.js</code> for a real LLM call when you're ready to go further.</p>
+      <a href="#agent" class="btn btn-primary">Try the agent again</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-row">
+    <span>SmartBuy AI · Student project on AI growth &amp; agentic commerce</span>
+    <span>Built with HTML, CSS &amp; vanilla JS — MIT licensed</span>
+  </div>
+</footer>
+
+<!-- ============================= CART DRAWER ============================= -->
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<aside class="cart-drawer" id="cartDrawer" role="dialog" aria-modal="true" aria-label="Shopping cart">
+  <div class="cart-head">
+    <h2>Your cart</h2>
+    <button class="icon-btn" id="cartClose" aria-label="Close cart">✕</button>
+  </div>
+  <div class="cart-items" id="cartItems"></div>
+  <p class="cart-empty" id="cartEmpty">Your cart is empty. Ask the agent for something, or add from the catalog.</p>
+  <div class="cart-summary">
+    <div class="cart-line"><span>Subtotal</span><span id="cartSubtotal">$0.00</span></div>
+    <div class="cart-line cart-line--muted"><span>Agentic savings check</span><span id="cartSavings">—</span></div>
+    <button class="btn btn-primary btn-block" id="checkoutBtn">Checkout</button>
+  </div>
+</aside>
+
+<!-- ============================= CHECKOUT MODAL ============================= -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal receipt" role="dialog" aria-modal="true" aria-label="Order confirmation">
+    <div class="receipt-tear" aria-hidden="true"></div>
+    <div class="receipt-body">
+      <h2>Order confirmed</h2>
+      <p class="mono" id="receiptId"></p>
+      <div class="receipt-lines" id="receiptLines"></div>
+      <div class="receipt-total mono">
+        <span>Total</span><span id="receiptTotal">$0.00</span>
+      </div>
+      <p class="receipt-note">The agent double-checked prices before confirming — no listing changed while your cart was open.</p>
+      <button class="btn btn-primary btn-block" id="receiptClose">Continue shopping</button>
+    </div>
+    <div class="receipt-tear" aria-hidden="true"></div>
+  </div>
+</div>
+
+<template id="productCardTemplate">
+  <article class="product-card">
+    <div class="product-media">
+      <span class="product-icon"></span>
+    </div>
+    <div class="product-body">
+      <p class="product-cat"></p>
+      <h3 class="product-name"></h3>
+      <p class="product-blurb"></p>
+      <div class="product-meta">
+        <span class="product-rating"></span>
+        <span class="product-price"></span>
+      </div>
+      <button class="btn btn-add" type="button">Add to cart</button>
+    </div>
+  </article>
+</template>
+
+<script>
+/* ==========================================================================
+   SmartBuy AI — Product dataset
+   No external images/APIs — every card renders from data + CSS, so the demo
+   works fully offline once the fonts have loaded once.
+   ========================================================================== */
+
+const PRODUCTS = [
+  { id: "p01", name: "AeroStride Running Shoes", brand: "Nimbus", category: "Sports", price: 89.99, rating: 4.6, reviews: 1042, tags: ["running","shoes","sports","fitness","jogging","lightweight"], icon: "👟", swatch: "teal", blurb: "Breathable knit upper, foam midsole tuned for daily miles." },
+  { id: "p02", name: "TrailBlaze Hiking Boots", brand: "Nimbus", category: "Sports", price: 134.00, rating: 4.4, reviews: 512, tags: ["hiking","boots","sports","outdoor","waterproof"], icon: "🥾", swatch: "coral", blurb: "Waterproof shell with grip soles built for rough terrain." },
+  { id: "p03", name: "Wireless ANC Headphones", brand: "Echelon", category: "Electronics", price: 149.50, rating: 4.7, reviews: 3390, tags: ["headphones","audio","electronics","travel","noise cancelling","wireless"], icon: "🎧", swatch: "ink", blurb: "30-hour battery, adaptive noise cancellation, plush earcups." },
+  { id: "p04", name: "Slimline Mechanical Keyboard", brand: "Keystroke Co.", category: "Electronics", price: 79.00, rating: 4.5, reviews: 876, tags: ["keyboard","electronics","office","typing","desk","work"], icon: "⌨️", swatch: "teal", blurb: "Hot-swappable switches, whisper-quiet, USB-C." },
+  { id: "p05", name: "4K Action Camera", brand: "Orbitcam", category: "Electronics", price: 219.00, rating: 4.3, reviews: 604, tags: ["camera","electronics","travel","adventure","video"], icon: "📷", swatch: "coral", blurb: "Stabilized 4K60 footage, waterproof to 10m without a case." },
+  { id: "p06", name: "Ceramic Pour-Over Set", brand: "Hearth", category: "Home", price: 42.00, rating: 4.8, reviews: 220, tags: ["coffee","kitchen","home","gift","morning"], icon: "☕", swatch: "ink", blurb: "Hand-glazed dripper and carafe for a slower morning." },
+  { id: "p07", name: "Weighted Sleep Blanket", brand: "Hearth", category: "Home", price: 64.50, rating: 4.6, reviews: 1830, tags: ["sleep","home","comfort","gift","relax"], icon: "🛏️", swatch: "teal", blurb: "7.5kg glass-bead fill, breathable cotton shell." },
+  { id: "p08", name: "Standing Desk Converter", brand: "Deskwell", category: "Home", price: 189.00, rating: 4.5, reviews: 640, tags: ["office","desk","work","home","ergonomic"], icon: "🖥️", swatch: "coral", blurb: "Sit-to-stand in one motion, holds dual monitors." },
+  { id: "p09", name: "Everyday Leather Backpack", brand: "Fieldstone", category: "Fashion", price: 118.00, rating: 4.7, reviews: 990, tags: ["backpack","fashion","travel","work","laptop bag"], icon: "🎒", swatch: "ink", blurb: "Full-grain leather, padded 15-inch laptop sleeve." },
+  { id: "p10", name: "Merino Wool Crewneck", brand: "Fieldstone", category: "Fashion", price: 68.00, rating: 4.5, reviews: 410, tags: ["sweater","fashion","winter","gift","clothing"], icon: "🧶", swatch: "teal", blurb: "Odor-resistant merino, breathable in every season." },
+  { id: "p11", name: "Polarized Sunglasses", brand: "Solstice", category: "Fashion", price: 54.00, rating: 4.4, reviews: 705, tags: ["sunglasses","fashion","summer","travel","accessory"], icon: "🕶️", swatch: "coral", blurb: "UV400 polarized lenses, spring-hinge titanium frame." },
+  { id: "p12", name: "Vitamin C Serum", brand: "Lumen", category: "Beauty", price: 28.00, rating: 4.6, reviews: 2210, tags: ["skincare","beauty","serum","gift","self-care"], icon: "💧", swatch: "ink", blurb: "15% stabilized vitamin C, brightens over 4 weeks." },
+  { id: "p13", name: "Bamboo Skincare Set", brand: "Lumen", category: "Beauty", price: 46.00, rating: 4.5, reviews: 380, tags: ["skincare","beauty","gift","set","self-care"], icon: "🌿", swatch: "teal", blurb: "Cleanser, toner and moisturizer in refillable bamboo jars." },
+  { id: "p14", name: "Smart Fitness Watch", brand: "Echelon", category: "Electronics", price: 159.00, rating: 4.5, reviews: 2670, tags: ["watch","electronics","fitness","sports","health"], icon: "⌚", swatch: "coral", blurb: "Heart-rate, sleep and workout tracking, 9-day battery." },
+  { id: "p15", name: "Cast Iron Skillet 12\"", brand: "Hearth", category: "Home", price: 39.00, rating: 4.9, reviews: 3040, tags: ["kitchen","home","cooking","gift"], icon: "🍳", swatch: "ink", blurb: "Pre-seasoned, oven-safe, gets better with every use." },
+  { id: "p16", name: "Compression Running Socks", brand: "Nimbus", category: "Sports", price: 18.00, rating: 4.3, reviews: 512, tags: ["running","sports","socks","fitness","accessory"], icon: "🧦", swatch: "teal", blurb: "Arch support and blister-free stitching, 3-pack." },
+  { id: "p17", name: "Yoga Mat Pro", brand: "Nimbus", category: "Sports", price: 45.00, rating: 4.6, reviews: 1150, tags: ["yoga","fitness","sports","home","exercise"], icon: "🧘", swatch: "coral", blurb: "Non-slip natural rubber, 5mm cushioning." },
+  { id: "p18", name: "Portable Bluetooth Speaker", brand: "Echelon", category: "Electronics", price: 59.99, rating: 4.4, reviews: 1980, tags: ["speaker","audio","electronics","travel","outdoor"], icon: "🔊", swatch: "ink", blurb: "IP67 waterproof, 12-hour battery, pairs in seconds." },
+  { id: "p19", name: "Linen Throw Pillow Set", brand: "Hearth", category: "Home", price: 34.00, rating: 4.5, reviews: 260, tags: ["home","decor","gift","living room"], icon: "🛋️", swatch: "teal", blurb: "Stonewashed linen covers, set of two, hidden zip." },
+  { id: "p20", name: "Minimalist Analog Watch", brand: "Solstice", category: "Fashion", price: 96.00, rating: 4.6, reviews: 840, tags: ["watch","fashion","gift","accessory","classic"], icon: "⏱️", swatch: "coral", blurb: "Sapphire-coated glass, vegan-leather strap." },
+  { id: "p21", name: "Insulated Travel Mug", brand: "Hearth", category: "Home", price: 24.00, rating: 4.7, reviews: 1490, tags: ["travel","coffee","gift","commute"], icon: "🥤", swatch: "ink", blurb: "Keeps drinks hot 6h / cold 12h, leak-proof lid." },
+  { id: "p22", name: "Recovery Massage Gun", brand: "Nimbus", category: "Sports", price: 99.00, rating: 4.4, reviews: 930, tags: ["fitness","recovery","sports","gift"], icon: "🔧", swatch: "teal", blurb: "Quiet-glide motor, 5 speeds, 4 interchangeable heads." },
+  { id: "p23", name: "Retinol Night Cream", brand: "Lumen", category: "Beauty", price: 32.00, rating: 4.5, reviews: 1120, tags: ["skincare","beauty","night","gift","self-care"], icon: "🌙", swatch: "coral", blurb: "Encapsulated retinol for gentle overnight renewal." },
+  { id: "p24", name: "Canvas Weekender Bag", brand: "Fieldstone", category: "Fashion", price: 88.00, rating: 4.6, reviews: 505, tags: ["travel","bag","fashion","weekend","gift"], icon: "🧳", swatch: "ink", blurb: "Water-resistant waxed canvas, fits airline carry-on rules." }
+];
+
+const CATEGORIES = ["All", "Electronics", "Fashion", "Home", "Sports", "Beauty"];
+
+// Curated starter prompts shown as quick-tap chips in the agent terminal
+const SUGGESTED_PROMPTS = [
+  "Running shoes under $100",
+  "A gift for a coffee lover, under $50",
+  "Best rated wireless headphones",
+  "Set up my home office under $300",
+  "Something for a hiking trip"
+];
+
+
+/* ==========================================================================
+   SmartBuy AI — Agent reasoning engine
+   A fully client-side "agentic commerce" simulation: it parses free-text
+   shopping requests into structured intent (budget, category, keywords,
+   quality bar), scores the catalog against that intent, and drafts a
+   natural-language reply — the same pipeline a real LLM-backed agent would
+   run, just implemented with transparent rules so this repo runs with
+   zero API keys and zero cost.
+   ========================================================================== */
+
+const Agent = (() => {
+
+  const CATEGORY_HINTS = {
+    Electronics: ["electronic","headphone","earbud","camera","keyboard","speaker","watch","tech","gadget","laptop","charger"],
+    Fashion: ["wear","jacket","bag","backpack","sunglasses","sweater","watch","style","outfit","clothing","accessory"],
+    Home: ["home","kitchen","desk","office","sleep","decor","coffee","furniture","room"],
+    Sports: ["run","hike","yoga","fitness","gym","workout","sport","outdoor","recovery","training"],
+    Beauty: ["skin","serum","cream","beauty","self-care","skincare","face"]
+  };
+
+  const QUALITY_WORDS = ["best","top","premium","high quality","highest rated","great","excellent"];
+  const BUDGET_WORDS = ["cheap","affordable","budget","inexpensive","low cost"];
+  const GIFT_WORDS = ["gift","present","someone","her","him","them"];
+
+  /** Pull a budget ceiling / range out of free text like "under $100" or "$40-$60". */
+  function parseBudget(text) {
+    const under = text.match(/(?:under|below|less than|up to|within)\s*\$?\s*(\d+(?:\.\d+)?)/i);
+    if (under) return { max: parseFloat(under[1]) };
+
+    const range = text.match(/\$?\s*(\d+(?:\.\d+)?)\s*(?:-|to)\s*\$?\s*(\d+(?:\.\d+)?)/i);
+    if (range) return { min: parseFloat(range[1]), max: parseFloat(range[2]) };
+
+    const bare = text.match(/\$\s*(\d+(?:\.\d+)?)/);
+    if (bare) return { max: parseFloat(bare[1]) };
+
+    return null;
+  }
+
+  function detectCategory(lowerText) {
+    for (const [cat, hints] of Object.entries(CATEGORY_HINTS)) {
+      if (hints.some(h => lowerText.includes(h))) return cat;
+    }
+    for (const cat of CATEGORIES) {
+      if (cat !== "All" && lowerText.includes(cat.toLowerCase())) return cat;
+    }
+    return null;
+  }
+
+  function extractKeywords(lowerText) {
+    return lowerText
+      .replace(/[^a-z0-9\s$.-]/g, " ")
+      .split(/\s+/)
+      .filter(w => w.length > 2);
+  }
+
+  /** Turn raw user text into a structured shopping intent. */
+  function parseIntent(rawText) {
+    const text = rawText.trim();
+    const lower = text.toLowerCase();
+
+    return {
+      raw: text,
+      budget: parseBudget(lower),
+      category: detectCategory(lower),
+      wantsQuality: QUALITY_WORDS.some(w => lower.includes(w)),
+      wantsBudget: BUDGET_WORDS.some(w => lower.includes(w)),
+      isGift: GIFT_WORDS.some(w => lower.includes(w)),
+      keywords: extractKeywords(lower)
+    };
+  }
+
+  /** Score one product against an intent. Higher is a better match. */
+  function scoreProduct(product, intent) {
+    let score = 0;
+    const hay = [product.name, product.brand, product.category, product.blurb, ...product.tags]
+      .join(" ").toLowerCase();
+
+    intent.keywords.forEach(k => { if (hay.includes(k)) score += 2; });
+    if (intent.category && product.category === intent.category) score += 6;
+
+    if (intent.budget) {
+      const { min, max } = intent.budget;
+      if (max !== undefined && product.price <= max) score += 5;
+      if (max !== undefined && product.price > max) score -= 8;
+      if (min !== undefined && product.price >= min) score += 2;
+      if (min !== undefined && product.price < min) score -= 3;
+    }
+
+    if (intent.wantsQuality) score += product.rating * 2;
+    if (intent.wantsBudget) score += (100 - product.price) / 25;
+    if (intent.isGift && product.tags.includes("gift")) score += 4;
+
+    score += product.rating; // base quality nudge, always applied lightly
+    return score;
+  }
+
+  /** Rank the full catalog for a piece of free text, return the top N. */
+  function recommend(rawText, limit = 4) {
+    const intent = parseIntent(rawText);
+    const ranked = PRODUCTS
+      .map(p => ({ product: p, score: scoreProduct(p, intent) }))
+      .filter(r => r.score > 2)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(r => r.product);
+    return { intent, results: ranked };
+  }
+
+  /** Draft the agent's chat reply given the intent + results it found. */
+  function draftReply(intent, results) {
+    if (results.length === 0) {
+      return `I couldn't find a confident match for "${intent.raw}" in the current catalog. Try a category like electronics, fashion, home, sports or beauty — or loosen the budget.`;
+    }
+
+    const bits = [];
+    if (intent.category) bits.push(intent.category.toLowerCase());
+    if (intent.budget && intent.budget.max !== undefined) bits.push(`under $${intent.budget.max}`);
+    if (intent.isGift) bits.push("as a gift");
+
+    const descriptor = bits.length ? ` (${bits.join(", ")})` : "";
+    const avgRating = (results.reduce((s, p) => s + p.rating, 0) / results.length).toFixed(1);
+    const savings = intent.budget && intent.budget.max
+      ? Math.max(0, (intent.budget.max * results.length - results.reduce((s, p) => s + p.price, 0))).toFixed(2)
+      : null;
+
+    let reply = `Scanned ${PRODUCTS.length} listings and ranked ${results.length} matches for you${descriptor}. `;
+    reply += `Average rating in this set: ${avgRating}★. `;
+    if (savings && Number(savings) > 0) {
+      reply += `Staying inside budget across all picks leaves about $${savings} of headroom. `;
+    }
+    reply += `Tap any card to add it straight to your cart.`;
+    return reply;
+  }
+
+  return { parseIntent, scoreProduct, recommend, draftReply };
+})();
+
+
+/* ==========================================================================
+   SmartBuy AI — App layer
+   Wires the dataset + agent engine to the DOM: catalog rendering & filters,
+   the agent chat terminal, and the cart/checkout flow. Vanilla JS, no
+   framework or build step, so it runs straight from index.html.
+   ========================================================================== */
+
+(() => {
+  "use strict";
+
+  /* ---------------------------------------------------------------------
+     State
+     --------------------------------------------------------------------- */
+
+  const state = {
+    category: "All",
+    search: "",
+    sort: "match",
+    lastMatchIds: [],   // most recent agent recommendation order, for "AI match" sort
+    cart: {}            // productId -> quantity
+  };
+
+  /* ---------------------------------------------------------------------
+     DOM references
+     --------------------------------------------------------------------- */
+
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+  const productGrid = $("#productGrid");
+  const emptyState = $("#emptyState");
+  const categoryChips = $("#categoryChips");
+  const sortSelect = $("#sortSelect");
+  const catalogSearch = $("#catalogSearch");
+  const cardTemplate = $("#productCardTemplate");
+
+  const chatLog = $("#chatLog");
+  const chatForm = $("#chatForm");
+  const chatInput = $("#chatInput");
+  const suggestionChips = $("#suggestionChips");
+
+  const cartToggle = $("#cartToggle");
+  const cartDrawer = $("#cartDrawer");
+  const drawerBackdrop = $("#drawerBackdrop");
+  const cartClose = $("#cartClose");
+  const cartItemsEl = $("#cartItems");
+  const cartEmptyEl = $("#cartEmpty");
+  const cartSubtotalEl = $("#cartSubtotal");
+  const cartSavingsEl = $("#cartSavings");
+  const cartCountEl = $("#cartCount");
+  const checkoutBtn = $("#checkoutBtn");
+
+  const modalBackdrop = $("#modalBackdrop");
+  const receiptId = $("#receiptId");
+  const receiptLines = $("#receiptLines");
+  const receiptTotal = $("#receiptTotal");
+  const receiptClose = $("#receiptClose");
+
+  const navToggle = $("#navToggle");
+  const mainNav = $("#mainNav");
+
+  const money = n => `$${n.toFixed(2)}`;
+  const findProduct = id => PRODUCTS.find(p => p.id === id);
+
+  /* ---------------------------------------------------------------------
+     Catalog: filters
+     --------------------------------------------------------------------- */
+
+  function renderCategoryChips() {
+    categoryChips.innerHTML = "";
+    CATEGORIES.forEach(cat => {
+      const btn = document.createElement("button");
+      btn.className = "chip";
+      btn.type = "button";
+      btn.textContent = cat;
+      btn.setAttribute("role", "tab");
+      btn.setAttribute("aria-selected", String(cat === state.category));
+      btn.addEventListener("click", () => {
+        state.category = cat;
+        renderCategoryChips();
+        renderCatalog();
+      });
+      categoryChips.appendChild(btn);
+    });
+  }
+
+  function getFilteredProducts() {
+    let list = PRODUCTS.filter(p => {
+      const matchesCategory = state.category === "All" || p.category === state.category;
+      const matchesSearch = !state.search ||
+        (p.name + " " + p.brand + " " + p.tags.join(" ")).toLowerCase().includes(state.search);
+      return matchesCategory && matchesSearch;
+    });
+
+    switch (state.sort) {
+      case "price-asc": list.sort((a, b) => a.price - b.price); break;
+      case "price-desc": list.sort((a, b) => b.price - a.price); break;
+      case "rating": list.sort((a, b) => b.rating - a.rating); break;
+      case "match":
+      default:
+        if (state.lastMatchIds.length) {
+          const rank = id => {
+            const i = state.lastMatchIds.indexOf(id);
+            return i === -1 ? 999 : i;
+          };
+          list.sort((a, b) => rank(a.id) - rank(b.id));
+        }
+        break;
+    }
+    return list;
+  }
+
+  function buildProductCard(product) {
+    const node = cardTemplate.content.firstElementChild.cloneNode(true);
+    node.dataset.swatch = product.swatch;
+    node.dataset.id = product.id;
+
+    $(".product-icon", node).textContent = product.icon;
+    $(".product-cat", node).textContent = product.category;
+    $(".product-name", node).textContent = product.name;
+    $(".product-blurb", node).textContent = product.blurb;
+    $(".product-rating", node).textContent = `★ ${product.rating} (${product.reviews})`;
+    $(".product-price", node).textContent = money(product.price);
+
+    const addBtn = $(".btn-add", node);
+    addBtn.addEventListener("click", () => {
+      addToCart(product.id);
+      addBtn.textContent = "Added ✓";
+      addBtn.dataset.added = "true";
+      setTimeout(() => { addBtn.textContent = "Add to cart"; addBtn.dataset.added = "false"; }, 1200);
+    });
+
+    return node;
+  }
+
+  function renderCatalog() {
+    const list = getFilteredProducts();
+    productGrid.innerHTML = "";
+    emptyState.hidden = list.length !== 0;
+    list.forEach(p => productGrid.appendChild(buildProductCard(p)));
+  }
+
+  categoryChips && renderCategoryChips();
+
+  sortSelect.addEventListener("change", () => {
+    state.sort = sortSelect.value;
+    renderCatalog();
+  });
+
+  catalogSearch.addEventListener("input", () => {
+    state.search = catalogSearch.value.trim().toLowerCase();
+    renderCatalog();
+  });
+
+  /* ---------------------------------------------------------------------
+     Agent chat
+     --------------------------------------------------------------------- */
+
+  function appendMessage(role, text, cards = null) {
+    const wrap = document.createElement("div");
+    wrap.className = `msg msg-${role}`;
+
+    const roleLabel = document.createElement("span");
+    roleLabel.className = "msg-role";
+    roleLabel.textContent = role === "user" ? "You" : "SmartBuy Agent";
+    wrap.appendChild(roleLabel);
+
+    const textEl = document.createElement("p");
+    textEl.className = "msg-text";
+    textEl.textContent = text;
+    wrap.appendChild(textEl);
+
+    if (cards && cards.length) {
+      const cardsWrap = document.createElement("div");
+      cardsWrap.className = "msg-cards";
+      cards.forEach(product => {
+        const cardBtn = document.createElement("button");
+        cardBtn.type = "button";
+        cardBtn.className = "msg-card";
+        cardBtn.innerHTML = `
+          <span class="mc-icon">${product.icon}</span>
+          <span class="mc-info">
+            <span class="mc-name">${product.name}</span><br>
+            <span class="mc-sub">${money(product.price)} · ★ ${product.rating}</span>
+          </span>
+          <span class="mc-add">Add +</span>
+        `;
+        cardBtn.addEventListener("click", () => {
+          addToCart(product.id);
+          const addLabel = $(".mc-add", cardBtn);
+          addLabel.textContent = "Added ✓";
+        });
+        cardsWrap.appendChild(cardBtn);
+      });
+      wrap.appendChild(cardsWrap);
+    }
+
+    chatLog.appendChild(wrap);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    return wrap;
+  }
+
+  function appendTyping() {
+    const wrap = document.createElement("div");
+    wrap.className = "msg msg-agent";
+    wrap.innerHTML = `
+      <span class="msg-role">SmartBuy Agent</span>
+      <span class="typing-dots"><span></span><span></span><span></span></span>
+    `;
+    chatLog.appendChild(wrap);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    return wrap;
+  }
+
+  function renderSuggestions() {
+    suggestionChips.innerHTML = "";
+    SUGGESTED_PROMPTS.forEach(prompt => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip-suggest";
+      chip.textContent = prompt;
+      chip.addEventListener("click", () => runAgentQuery(prompt));
+      suggestionChips.appendChild(chip);
+    });
+  }
+
+  function runAgentQuery(text) {
+    if (!text || !text.trim()) return;
+    appendMessage("user", text);
+    chatInput.value = "";
+
+    const typingEl = appendTyping();
+
+    // Simulated "thinking" delay so the agent loop is visible, not instant.
+    setTimeout(() => {
+      typingEl.remove();
+      const { intent, results } = Agent.recommend(text, 4);
+      const reply = Agent.draftReply(intent, results);
+      state.lastMatchIds = results.map(p => p.id);
+      appendMessage("agent", reply, results);
+
+      // If the agent found a category, quietly sync the catalog filters
+      // so "browse catalog" reflects what was just discussed.
+      if (intent.category && CATEGORIES.includes(intent.category)) {
+        state.category = intent.category;
+        renderCategoryChips();
+      }
+      state.sort = "match";
+      sortSelect.value = "match";
+      renderCatalog();
+    }, 550 + Math.random() * 400);
+  }
+
+  chatForm.addEventListener("submit", e => {
+    e.preventDefault();
+    runAgentQuery(chatInput.value);
+  });
+
+  function greet() {
+    appendMessage(
+      "agent",
+      "Hi, I'm your SmartBuy agent. Tell me what you're shopping for — a category, a budget, or an occasion — and I'll scan the catalog and rank the best fits."
+    );
+  }
+
+  /* ---------------------------------------------------------------------
+     Cart
+     --------------------------------------------------------------------- */
+
+  function addToCart(productId, qty = 1) {
+    state.cart[productId] = (state.cart[productId] || 0) + qty;
+    renderCart();
+    openCart();
+  }
+
+  function setQty(productId, qty) {
+    if (qty <= 0) { delete state.cart[productId]; }
+    else { state.cart[productId] = qty; }
+    renderCart();
+  }
+
+  function cartEntries() {
+    return Object.entries(state.cart)
+      .map(([id, qty]) => ({ product: findProduct(id), qty }))
+      .filter(e => e.product);
+  }
+
+  function renderCart() {
+    const entries = cartEntries();
+    cartItemsEl.innerHTML = "";
+    cartEmptyEl.hidden = entries.length !== 0;
+
+    let subtotal = 0;
+    let totalQty = 0;
+
+    entries.forEach(({ product, qty }) => {
+      subtotal += product.price * qty;
+      totalQty += qty;
+
+      const row = document.createElement("div");
+      row.className = "cart-item";
+      row.innerHTML = `
+        <div class="cart-item-icon">${product.icon}</div>
+        <div class="cart-item-info">
+          <p class="cart-item-name">${product.name}</p>
+          <p class="cart-item-price">${money(product.price)} each</p>
+          <div class="qty-row">
+            <button class="qty-btn" data-action="dec" aria-label="Decrease quantity">−</button>
+            <span class="qty-val">${qty}</span>
+            <button class="qty-btn" data-action="inc" aria-label="Increase quantity">+</button>
+            <button class="cart-item-remove" data-action="remove">Remove</button>
+          </div>
+        </div>
+      `;
+      row.querySelector('[data-action="inc"]').addEventListener("click", () => setQty(product.id, qty + 1));
+      row.querySelector('[data-action="dec"]').addEventListener("click", () => setQty(product.id, qty - 1));
+      row.querySelector('[data-action="remove"]').addEventListener("click", () => setQty(product.id, 0));
+      cartItemsEl.appendChild(row);
+    });
+
+    cartSubtotalEl.textContent = money(subtotal);
+    cartCountEl.textContent = String(totalQty);
+
+    if (entries.length) {
+      const avgRating = entries.reduce((s, e) => s + e.product.rating, 0) / entries.length;
+      cartSavingsEl.textContent = avgRating >= 4.5 ? "Strong picks — avg rating above 4.5★" : "Good picks — avg rating above 4★";
+    } else {
+      cartSavingsEl.textContent = "—";
+    }
+
+    checkoutBtn.disabled = entries.length === 0;
+  }
+
+  function openCart() {
+    cartDrawer.classList.add("open");
+    drawerBackdrop.classList.add("open");
+  }
+  function closeCart() {
+    cartDrawer.classList.remove("open");
+    drawerBackdrop.classList.remove("open");
+  }
+
+  cartToggle.addEventListener("click", openCart);
+  cartClose.addEventListener("click", closeCart);
+  drawerBackdrop.addEventListener("click", closeCart);
+
+  /* ---------------------------------------------------------------------
+     Checkout
+     --------------------------------------------------------------------- */
+
+  function openReceipt() {
+    const entries = cartEntries();
+    if (!entries.length) return;
+
+    const orderNum = "SB-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+    receiptId.textContent = `Order #${orderNum} · ${new Date().toLocaleString()}`;
+
+    receiptLines.innerHTML = "";
+    let total = 0;
+    entries.forEach(({ product, qty }) => {
+      total += product.price * qty;
+      const line = document.createElement("div");
+      line.className = "receipt-line";
+      line.innerHTML = `<span>${product.name} × ${qty}</span><span>${money(product.price * qty)}</span>`;
+      receiptLines.appendChild(line);
+    });
+    receiptTotal.textContent = money(total);
+
+    modalBackdrop.classList.add("open");
+    closeCart();
+  }
+
+  function closeReceipt() {
+    modalBackdrop.classList.remove("open");
+    state.cart = {};
+    renderCart();
+  }
+
+  checkoutBtn.addEventListener("click", openReceipt);
+  receiptClose.addEventListener("click", closeReceipt);
+  modalBackdrop.addEventListener("click", e => { if (e.target === modalBackdrop) closeReceipt(); });
+
+  /* ---------------------------------------------------------------------
+     Nav (mobile)
+     --------------------------------------------------------------------- */
+
+  navToggle.addEventListener("click", () => {
+    const open = mainNav.classList.toggle("open");
+    navToggle.setAttribute("aria-expanded", String(open));
+  });
+  $$("#mainNav a").forEach(a => a.addEventListener("click", () => {
+    mainNav.classList.remove("open");
+    navToggle.setAttribute("aria-expanded", "false");
+  }));
+
+  /* ---------------------------------------------------------------------
+     Init
+     --------------------------------------------------------------------- */
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") { closeCart(); closeReceipt(); }
+  });
+
+  renderSuggestions();
+  renderCatalog();
+  renderCart();
+  greet();
+})();
+
+</script>
+</body>
+</html>
